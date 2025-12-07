@@ -1,12 +1,10 @@
 // sketch.js
 
-let fileData = []; // Pole pro data všech souborů
-let mainContainer, rightPane, tableContainer, downloadBtn;
+let fileData = [];
+let mainContainer, rightPane, tableContainer, downloadBtn, zipBtn;
 
 function setup() {
   noCanvas();
-
-  // --- 1. Vytvoření vzhledu (UI) ---
 
   // Hlavní kontejner
   mainContainer = createDiv().style(
@@ -20,80 +18,70 @@ function setup() {
   rightPane.parent(mainContainer);
 
   // Nadpis
-  const title = createElement('h1', 'Přejmenování souborů na základě uložených GPS dat');
+  const title = createElement('h1', 'Hromadné přejmenování fotek podle GPS');
   title.style('font-size: 48px; margin-top: 0;');
   title.parent(rightPane);
 
-  // Kontejner pro input
+  // Input
   const inputContainer = createDiv().style('margin-bottom: 30px;');
   inputContainer.parent(rightPane);
 
-  // 'true' povoluje výběr více souborů
   let inputEl = createFileInput(handleFiles, true);
   inputEl.parent(inputContainer);
   inputEl.style('font-size: 18px');
 
-  // Místo pro tabulku
+  // Kontejner pro tabulku
   tableContainer = createDiv();
   tableContainer.parent(rightPane);
 
-  // Tlačítko Stáhnout (skryté)
+  // Tlačítko – stáhnout všechny jednotlivě
   downloadBtn = createButton('Stáhnout všechny soubory');
-  downloadBtn.style(
-    'font-size: 24px; padding: 15px 30px; background: black; color: white; ' +
-    'border: none; border-radius: 12px; margin-top: 30px; cursor: pointer; ' +
-    'display: none; font-weight: bold;'
-  );
+  downloadBtn.style(`
+    font-size: 20px; padding: 5px 15px; background: #007bff; color: white;
+    border: none; border-radius: 10px; margin-top: 30px; cursor: pointer;
+    display: none; font-weight: bold;
+  `);
   downloadBtn.parent(rightPane);
   downloadBtn.mousePressed(downloadAllFiles);
+
+  // Tlačítko – ZIP
+  zipBtn = createButton('Stáhnout jako ZIP');
+  zipBtn.style(`
+    font-size: 20px; padding: 5px 15px; background: #28a745; color: white;
+    border: none; border-radius: 10px; margin-top: 20px; cursor: pointer;
+    display: none; font-weight: bold;
+  `);
+  zipBtn.parent(rightPane);
+  zipBtn.mousePressed(downloadAsZip);
 }
 
-// --- 2. Zpracování souborů ---
+// --- ZPRACOVÁNÍ SOUBORŮ ---
 
-// Callback pro createFileInput při multiple = true
 function handleFiles(files) {
-  if (!Array.isArray(files)) {
-    files = [files];
-  }
-
+  if (!Array.isArray(files)) files = [files];
   for (const file of files) {
-    if (file && file.type === 'image') {
-      processFile(file);
-    }
+    if (file.type === 'image') processFile(file);
   }
 }
 
-// Zpracování jednoho souboru
 async function processFile(file) {
   let gpsCoords = 'Bez GPS';
   let safeName = null;
 
   try {
-    if (window.exifr) {
-      // *** KLÍČOVÁ ZMĚNA: použijeme exifr.gps() ***
-      const gps = await window.exifr.gps(file.file);
+    const gps = await window.exifr.gps(file.file);
 
-      console.log('EXIF GPS výstup pro', file.name, gps);
+    if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+      const lat = gps.latitude.toFixed(6);
+      const lon = gps.longitude.toFixed(6);
 
-      if (
-        gps &&
-        typeof gps.latitude === 'number' &&
-        typeof gps.longitude === 'number'
-      ) {
-        const lat = gps.latitude.toFixed(6);
-        const lon = gps.longitude.toFixed(6);
-
-        gpsCoords = `${lat}, ${lon}`;
-        safeName = `${lat.replace('.', '.')}, ${lon.replace('.', '.')}`;
-      }
-    } else {
-      console.error('Knihovna exifr není k dispozici.');
+      gpsCoords = `${lat}, ${lon}`;
+      safeName = `${lat.replace('.', '_')}-${lon.replace('.', '_')}`;
     }
-  } catch (e) {
-    console.error('Chyba při čtení EXIF:', e);
+  } catch (err) {
+    console.error('Chyba při čtení EXIF GPS:', err);
   }
 
-  // Uložení dat o souboru do globálního pole
   fileData.push({
     originalName: file.name,
     blob: file.file,
@@ -101,85 +89,104 @@ async function processFile(file) {
     safeName: safeName
   });
 
-  // Aktualizace tabulky
   renderTable();
 }
 
-// --- 3. Vykreslení tabulky ---
+// --- TABULKA ---
 
 function renderTable() {
-  tableContainer.html(''); // Smazat starý obsah
+  tableContainer.html('');
 
-  if (fileData.length > 0) {
-    downloadBtn.style('display', 'inline-block');
-
-    let html = `
-      <table>
-        <thead>
-          <tr>
-            <th>Původní název</th>
-            <th>Nalezené souřadnice</th>
-            <th>Bude přejmenováno na</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-
-    fileData.forEach(item => {
-      let ext = getExtension(item.originalName) || '.jpg';
-      let newName = item.safeName
-        ? (item.safeName + ext)
-        : '<span style="color:gray">—</span>';
-      let coordStyle = item.safeName
-        ? 'color: green; font-weight: bold;'
-        : 'color: red;';
-
-      html += `
-        <tr>
-          <td>${item.originalName}</td>
-          <td style="${coordStyle}">${item.coords}</td>
-          <td>${newName}</td>
-        </tr>
-      `;
-    });
-
-    html += `</tbody></table>`;
-    tableContainer.html(html);
-  } else {
+  if (fileData.length === 0) {
     downloadBtn.style('display', 'none');
+    zipBtn.style('display', 'none');
+    return;
   }
+
+  downloadBtn.style('display', 'inline-block');
+  zipBtn.style('display', 'inline-block');
+
+  let html = `
+    <table>
+      <thead>
+        <tr>
+          <th>Původní název</th>
+          <th>Nalezené souřadnice</th>
+          <th>Bude přejmenováno na</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  fileData.forEach(item => {
+    let ext = getExtension(item.originalName);
+    let newName = item.safeName ? (item.safeName + ext) : '—';
+    let style = item.safeName ? 'color: green; font-weight: bold;' : 'color: red;';
+
+    html += `
+      <tr>
+        <td>${item.originalName}</td>
+        <td style="${style}">${item.coords}</td>
+        <td>${newName}</td>
+      </tr>
+    `;
+  });
+
+  html += '</tbody></table>';
+  tableContainer.html(html);
 }
 
-// --- 4. Stahování ---
+// --- STAHOVÁNÍ JEDNOTLIVĚ ---
 
 async function downloadAllFiles() {
-  const btn = downloadBtn;
-  const oldText = btn.html();
-  btn.html('⏳ Stahuji... prosím čekejte');
-  btn.attribute('disabled', '');
+  downloadBtn.attribute('disabled', '');
+  downloadBtn.html('Stahuji…');
 
-  let count = 0;
-
-  for (let item of fileData) {
+  for (const item of fileData) {
     if (item.safeName) {
-      let ext = getExtension(item.originalName) || '.jpg';
+      let ext = getExtension(item.originalName);
       let fileName = item.safeName + ext;
-
       saveBlob(item.blob, fileName);
-      count++;
-
-      // Krátká pauza, aby prohlížeč neblokoval stahování
       await new Promise(r => setTimeout(r, 400));
     }
   }
 
-  btn.html(oldText);
-  btn.removeAttribute('disabled');
+  downloadBtn.removeAttribute('disabled');
+  downloadBtn.html('Stáhnout všechny soubory');
+}
+
+// --- STAHOVÁNÍ ZIPU ---
+
+async function downloadAsZip() {
+  zipBtn.attribute('disabled', '');
+  zipBtn.html('Tvořím ZIP…');
+
+  let zip = new JSZip();
+  let count = 0;
+
+  for (let item of fileData) {
+    if (item.safeName) {
+      let ext = getExtension(item.originalName);
+      zip.file(item.safeName + ext, item.blob);
+      count++;
+    }
+  }
 
   if (count === 0) {
-    alert('Žádný soubor neměl GPS data.');
+    alert('Žádný soubor nemá GPS data.');
+    zipBtn.removeAttribute('disabled');
+    zipBtn.html('Stáhnout jako ZIP');
+    return;
   }
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  saveAs(content, 'GPS–Fotky.zip');
+
+  zipBtn.removeAttribute('disabled');
+  zipBtn.html('Stáhnout jako ZIP');
 }
+
+// --- POMOCNÉ FUNKCE ---
 
 function saveBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
@@ -188,11 +195,11 @@ function saveBlob(blob, fileName) {
   a.download = fileName;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
 function getExtension(name) {
   const i = name.lastIndexOf('.');
-  return i >= 0 ? name.slice(i) : '';
+  return i >= 0 ? name.slice(i) : '.jpg';
 }
