@@ -1,0 +1,41 @@
+body {
+  background: #d3d3d3;
+  margin: 0;
+  font-family: 'Neue Haas', 'Inter', sans-serif;
+  padding: 40px;
+}
+
+/* Hlavní tabulka */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th {
+  text-align: left;
+  padding: 12px;
+  background: #f1f1f1;
+  border-bottom: 2px solid #ddd;
+}
+
+td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+/* Střídání barev řádků */
+tr:nth-child(even) { 
+  background-color: #fafafa; 
+}
+
+/* Stylování tlačítka pro výběr souboru */
+input[type="file"]::file-selector-button {
+  font-size: 16px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #e6e6e6;
+  cursor: pointer;
+  margin-right: 15px;
+}
