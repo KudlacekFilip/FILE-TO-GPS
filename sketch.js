@@ -76,7 +76,8 @@ async function processFile(file) {
       const lon = gps.longitude.toFixed(6);
 
       gpsCoords = `${lat}, ${lon}`;
-      safeName = `${lat.replace('.', '_')}-${lon.replace('.', '_')}`;
+      // ZDE JE ZMĚNA: Formátování názvu přesně podle vašeho požadavku
+      safeName = `${lat}, ${lon}`;
     }
   } catch (err) {
     console.error('Chyba při čtení EXIF GPS:', err);
@@ -107,12 +108,12 @@ function renderTable() {
   zipBtn.style('display', 'inline-block');
 
   let html = `
-    <table>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
       <thead>
-        <tr>
-          <th>Původní název</th>
-          <th>Nalezené souřadnice</th>
-          <th>Bude přejmenováno na</th>
+        <tr style="border-bottom: 2px solid #ddd; text-align: left;">
+          <th style="padding: 10px;">Původní název</th>
+          <th style="padding: 10px;">Nalezené souřadnice</th>
+          <th style="padding: 10px;">Nový název souboru</th>
         </tr>
       </thead>
       <tbody>
@@ -124,10 +125,10 @@ function renderTable() {
     let style = item.safeName ? 'color: green; font-weight: bold;' : 'color: red;';
 
     html += `
-      <tr>
-        <td>${item.originalName}</td>
-        <td style="${style}">${item.coords}</td>
-        <td>${newName}</td>
+      <tr style="border-bottom: 1px solid #eee;">
+        <td style="padding: 10px;">${item.originalName}</td>
+        <td style="padding: 10px; ${style}">${item.coords}</td>
+        <td style="padding: 10px;">${newName}</td>
       </tr>
     `;
   });
